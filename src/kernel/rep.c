@@ -59,6 +59,7 @@ static int reportfs_fill_super(struct super_block *sb, void *data, int silent) {
   pfn_t __pfn_t;
   long size;
   int ret;
+  struct timespec64 ts;
 
   sbi = kzalloc(sizeof(struct report_sbi), GFP_KERNEL);
   if (!sbi)
@@ -75,7 +76,7 @@ static int reportfs_fill_super(struct super_block *sb, void *data, int silent) {
   sb->s_fs_info = sbi;
   sbi->sb = sb;
 
-  ret = bdev_dax_supported(sb, PAGE_SIZE);
+  ret = bdev_dax_supported(sb->s_bdev, PAGE_SIZE);
   pr_info("%s: dax_supported = %d; bdev->super=0x%p", __func__, ret,
           sb->s_bdev->bd_super);
   if (ret) {
@@ -85,7 +86,7 @@ static int reportfs_fill_super(struct super_block *sb, void *data, int silent) {
 
   sbi->s_bdev = sb->s_bdev;
 
-  dax_dev = fs_dax_get_by_host(sb->s_bdev->bd_disk->disk_name);
+  dax_dev = dax_get_by_host(sb->s_bdev->bd_disk->disk_name);
   if (!dax_dev) {
     pr_err("Couldn't retrieve DAX device.\n");
     return -EINVAL;
@@ -115,7 +116,8 @@ static int reportfs_fill_super(struct super_block *sb, void *data, int silent) {
 
   root->i_ino = 0;
   root->i_sb = sb;
-  root->i_atime = root->i_mtime = root->i_ctime = current_kernel_time();
+  ktime_get_ts64(&ts);
+  root->i_atime = root->i_mtime = root->i_ctime = ts;
   inode_init_owner(root, NULL, S_IFDIR);
 
   sb->s_root = d_make_root(root);

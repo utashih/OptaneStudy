@@ -230,7 +230,7 @@ int strided_latjob(void *arg)
 	uint8_t *buf = ctx->addr;
 	uint8_t *region_end = buf + GLOBAL_WORKSET;
 	long count = GLOBAL_WORKSET / access_size;
-	struct timespec tstart, tend;
+	struct timespec64 tstart, tend;
 	long pages, diff;
 	int hash = 0;
 	int i;
@@ -260,14 +260,14 @@ int strided_latjob(void *arg)
 		kr_info("Running %s\n", bench_size_map[i]);
 		BENCHMARK_BEGIN(flags);
 
-		getrawmonotonic(&tstart);
+		ktime_get_raw_ts64(&tstart);
 		PERF_START();
 
 		lfs_stride_bw[i](buf, access_size, stride_size, delay, count);
 		asm volatile ("mfence \n" :::);
 
 		PERF_STOP();
-		getrawmonotonic(&tend);
+		ktime_get_raw_ts64(&tend);
 
 		diff = TIMEDIFF(tstart, tend);
 		BENCHMARK_END(flags);
@@ -427,7 +427,7 @@ int read_after_write_job(void *arg)
 	uint8_t *buf = ctx->addr;
 	uint8_t *region_end = buf + GLOBAL_WORKSET;
 	long count = GLOBAL_WORKSET / access_size;
-	struct timespec tstart, tend;
+	struct timespec64 tstart, tend;
 	unsigned int c_store_start_hi, c_store_start_lo;
 	unsigned int c_ntload_start_hi, c_ntload_start_lo;
 	unsigned int c_ntload_end_hi, c_ntload_end_lo;
@@ -462,7 +462,7 @@ int read_after_write_job(void *arg)
 	BENCHMARK_BEGIN(flags);
 
 #define RAW_BEFORE_WRITE 												\
-	getrawmonotonic(&tstart); 											\
+	ktime_get_raw_ts64(&tstart); 											\
 	asm volatile ( 														\
 		"rdtscp \n\t" 													\
 		"lfence \n\t" 													\
@@ -494,7 +494,7 @@ int read_after_write_job(void *arg)
 		:																\
 		: "rdx", "rax", "rcx"											\
 	);																	\
-	getrawmonotonic(&tend);												\
+	ktime_get_raw_ts64(&tend);												\
 	diff = TIMEDIFF(tstart, tend);										\
 	c_store_start = (((unsigned long)c_store_start_hi) << 32) | c_store_start_lo;			\
 	c_ntload_start = (((unsigned long)c_ntload_start_hi) << 32) | c_ntload_start_lo;		\
@@ -561,7 +561,7 @@ int straight_write_job(void *arg)
 	uint8_t *region_end = buf + workset;
 	long count = workset / write_size;
 	long iter;
-	struct timespec tstart, tend;
+	struct timespec64 tstart, tend;
 
 
 	if (write_size * count > workset)
@@ -582,7 +582,7 @@ int straight_write_job(void *arg)
 
 	BENCHMARK_BEGIN(flags);
 
-	getrawmonotonic(&tstart);
+	ktime_get_raw_ts64(&tstart);
 	while (count >= 0) {
 
 		stride_nt(buf, write_size, 0, 0, iter);
@@ -592,7 +592,7 @@ int straight_write_job(void *arg)
 			break;
 		schedule(); // Schedule with IRQ disabled?
 	}
-	getrawmonotonic(&tend);
+	ktime_get_raw_ts64(&tend);
 
 	BENCHMARK_END(flags);
 	diff = TIMEDIFF(tstart, tend);
@@ -851,7 +851,7 @@ int cacheprobe_job(void *arg)
 	long acount = count;
 	uint8_t *buf = ctx->addr;
 	uint8_t *buf_end;
-	struct timespec tstart, tend;
+	struct timespec64 tstart, tend;
 	uint64_t diff;
 	uint64_t iters; /* At least write 1 GB */
 	uint64_t aiters;
@@ -872,7 +872,7 @@ int cacheprobe_job(void *arg)
 
 	kr_info("CacheProbe buf %p->%p count 0x%ld(repeat %lld), stride 0x%lx, iters %lld\n", buf, buf_end, count, aiters, stride, iters);
 
-	getrawmonotonic(&tstart);
+	ktime_get_raw_ts64(&tstart);
 	BENCHMARK_BEGIN(flags);
 
 	for (j = 0; j < aiters; j++){
@@ -883,7 +883,7 @@ int cacheprobe_job(void *arg)
 		}
 	}
 	BENCHMARK_END(flags);
-	getrawmonotonic(&tend);
+	ktime_get_raw_ts64(&tend);
 
 	diff = TIMEDIFF(tstart, tend);
 	kr_info("%lld ns.\n", diff);
@@ -901,13 +901,13 @@ int imcprobe_job(void *arg)
 	long count = (1UL * GB / access_size);
 	uint8_t *buf = ctx->addr;
 	uint8_t *buf_end = ctx->addr + access_size;
-	struct timespec tstart, tend;
+	struct timespec64 tstart, tend;
 	uint64_t diff;
 	int i;
 
 	kr_info("iMCProbe begin %p, access_size %ld, iters %ld\n", buf, access_size, count);
 
-	getrawmonotonic(&tstart);
+	ktime_get_raw_ts64(&tstart);
 	BENCHMARK_BEGIN(flags);
 	for (i = 0; i < 8; i++) {
 		imcprobe(buf, buf_end, count);
@@ -916,7 +916,7 @@ int imcprobe_job(void *arg)
 		schedule(); // Schedule with IRQ disabled?
 	}
 	BENCHMARK_END(flags);
-	getrawmonotonic(&tend);
+	ktime_get_raw_ts64(&tend);
 
 	diff = TIMEDIFF(tstart, tend);
 	kr_info("%lld ns.\n", diff);
